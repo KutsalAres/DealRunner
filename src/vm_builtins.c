@@ -7739,6 +7739,74 @@ static RValue builtin_make_colour_hsv(VMContext* ctx, RValue* args, int32_t argC
     return builtin_make_color_hsv(ctx, args, argCount);
 }
 
+static RValue builtin_color_get_red(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(0.0);
+    return RValue_makeReal((GMLReal) BGR_R(RValue_toInt32(args[0])));
+}
+
+static RValue builtin_color_get_green(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(0.0);
+    return RValue_makeReal((GMLReal) BGR_G(RValue_toInt32(args[0])));
+}
+
+static RValue builtin_color_get_blue(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(0.0);
+    return RValue_makeReal((GMLReal) BGR_B(RValue_toInt32(args[0])));
+}
+
+// Matches HTML5 Color_RGBtoHSV: returns h/s/v in [0,255] as floats (no rounding).
+static void Color_RGBtoHSV(int32_t col, GMLReal* outH, GMLReal* outS, GMLReal* outV) {
+    GMLReal r = (GMLReal) BGR_R(col) / 255.0;
+    GMLReal g = (GMLReal) BGR_G(col) / 255.0;
+    GMLReal b = (GMLReal) BGR_B(col) / 255.0;
+    GMLReal m = r;
+    if (g < m) m = g;
+    if (b < m) m = b;
+    GMLReal v = r;
+    if (g > v) v = g;
+    if (b > v) v = b;
+    GMLReal d = v - m;
+
+    GMLReal s = (v == 0.0) ? 0.0 : (d / v);
+    GMLReal h;
+    if (s == 0.0)        h = 0.0;
+    else if (r == v)     h = 60.0  * (g - b) / d;
+    else if (g == v)     h = 120.0 + 60.0 * (b - r) / d;
+    else                 h = 240.0 + 60.0 * (r - g) / d;
+    if (0.0 > h) h += 360.0;
+
+    GMLReal hOut = (h * 255.0) / 360.0;
+    GMLReal sOut = s * 255.0;
+    GMLReal vOut = v * 255.0;
+    if (0.0 > hOut) hOut = 0.0; else if (hOut > 255.0) hOut = 255.0;
+    if (0.0 > sOut) sOut = 0.0; else if (sOut > 255.0) sOut = 255.0;
+    if (0.0 > vOut) vOut = 0.0; else if (vOut > 255.0) vOut = 255.0;
+    *outH = hOut;
+    *outS = sOut;
+    *outV = vOut;
+}
+
+static RValue builtin_color_get_hue(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(0.0);
+    GMLReal h, s, v;
+    Color_RGBtoHSV(RValue_toInt32(args[0]), &h, &s, &v);
+    return RValue_makeReal(h);
+}
+
+static RValue builtin_color_get_saturation(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(0.0);
+    GMLReal h, s, v;
+    Color_RGBtoHSV(RValue_toInt32(args[0]), &h, &s, &v);
+    return RValue_makeReal(s);
+}
+
+static RValue builtin_color_get_value(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(0.0);
+    GMLReal h, s, v;
+    Color_RGBtoHSV(RValue_toInt32(args[0]), &h, &s, &v);
+    return RValue_makeReal(v);
+}
+
 // Display stubs
 STUB_RETURN_VALUE(display_get_width, 640.0)
 STUB_RETURN_VALUE(display_get_height, 480.0)
@@ -11410,6 +11478,18 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "make_colour_rgb", builtin_make_colour_rgb);
     VM_registerBuiltin(ctx, "make_color_hsv", builtin_make_color_hsv);
     VM_registerBuiltin(ctx, "make_colour_hsv", builtin_make_colour_hsv);
+    VM_registerBuiltin(ctx, "color_get_red", builtin_color_get_red);
+    VM_registerBuiltin(ctx, "colour_get_red", builtin_color_get_red);
+    VM_registerBuiltin(ctx, "color_get_green", builtin_color_get_green);
+    VM_registerBuiltin(ctx, "colour_get_green", builtin_color_get_green);
+    VM_registerBuiltin(ctx, "color_get_blue", builtin_color_get_blue);
+    VM_registerBuiltin(ctx, "colour_get_blue", builtin_color_get_blue);
+    VM_registerBuiltin(ctx, "color_get_hue", builtin_color_get_hue);
+    VM_registerBuiltin(ctx, "colour_get_hue", builtin_color_get_hue);
+    VM_registerBuiltin(ctx, "color_get_saturation", builtin_color_get_saturation);
+    VM_registerBuiltin(ctx, "colour_get_saturation", builtin_color_get_saturation);
+    VM_registerBuiltin(ctx, "color_get_value", builtin_color_get_value);
+    VM_registerBuiltin(ctx, "colour_get_value", builtin_color_get_value);
 
     // Display
     VM_registerBuiltin(ctx, "display_get_width", builtin_display_get_width);
