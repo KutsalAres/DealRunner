@@ -6385,6 +6385,17 @@ static RValue builtin_action_move_to(VMContext* ctx, MAYBE_UNUSED RValue* args, 
     return RValue_makeUndefined();
 }
 
+// action_move_start(): teleport the current instance back to its (xstart, ystart) spawn position.
+static RValue builtin_action_move_start(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    if (ctx->currentInstance != nullptr) {
+        Instance* inst = ctx->currentInstance;
+        inst->x = inst->xstart;
+        inst->y = inst->ystart;
+        SpatialGrid_markInstanceAsDirty(ctx->runner->spatialGrid, inst);
+    }
+    return RValue_makeUndefined();
+}
+
 static RValue builtin_action_snap(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
     GMLReal hsnap = RValue_toReal(args[0]);
     GMLReal vsnap = RValue_toReal(args[1]);
@@ -12164,6 +12175,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
         VM_registerBuiltin(ctx, "action_set_relative", builtin_action_set_relative);
         VM_registerBuiltin(ctx, "action_move", builtin_action_move);
         VM_registerBuiltin(ctx, "action_move_to", builtin_action_move_to);
+        VM_registerBuiltin(ctx, "action_move_start", builtin_action_move_start);
         VM_registerBuiltin(ctx, "action_snap", builtin_action_snap);
         VM_registerBuiltin(ctx, "action_set_friction", builtin_action_set_friction);
         VM_registerBuiltin(ctx, "action_set_gravity", builtin_action_set_gravity);
