@@ -1915,7 +1915,7 @@ static void parseROOM(BinaryReader* reader, DataWin* dw, bool lazyLoadRooms, Str
 }
 
 // Parses a TexturePageItem at the current reader position
-// If i = -1, a new item entry will be allocated
+// If i = -1, a new item entry will be allocated AND will be marked as a WinPack WAD
 // Returns the index of the TPAG
 static int32_t parseTexturePageItem(BinaryReader* reader, DataWin* dw, int32_t i) {
     int32_t position = i;
@@ -1945,6 +1945,11 @@ static int32_t parseTexturePageItem(BinaryReader* reader, DataWin* dw, int32_t i
     item->boundingWidth = BinaryReader_readUint16(reader);
     item->boundingHeight = BinaryReader_readUint16(reader);
     item->texturePageId = BinaryReader_readInt16(reader);
+
+    if (i == -1) {
+        // WinPack texture pages are off by one, because uuhh... it seems that it considers the runner allocated 1x1 white texture for some reason?!
+        item->texturePageId -= 1;
+    }
 
     return position;
 }
