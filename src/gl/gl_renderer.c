@@ -157,7 +157,7 @@ static void flushBatch(GLRenderer* gl) {
             glActiveTexture(GL_TEXTURE0 + slot);
                 glBindTexture(GL_TEXTURE_2D, gl->currentTextureId);
         }
-        
+
     } else {
         glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, gl->currentTextureId);
@@ -1932,7 +1932,21 @@ static void glShaderSetUniformF(Renderer* renderer, int32_t handle, int32_t coun
     } else if (RealCount == 4) {
     glUniform4f(handle, value1, value2, value3, value4);
     }
-    
+
+}
+
+static void glShaderSetUniformI(Renderer* renderer, int32_t handle, int32_t count, int32_t value1, int32_t value2, int32_t value3, int32_t value4) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+    flushBatch(gl);
+    if (count == 1) {
+        glUniform1i(handle, value1);
+    } else if (count == 2) {
+        glUniform2i(handle, value1, value2);
+    } else if (count == 3) {
+        glUniform3i(handle, value1, value2, value3);
+    } else if (count == 4) {
+        glUniform4i(handle, value1, value2, value3, value4);
+    }
 }
 
 static uint32_t glSpriteGetTexture(Renderer* renderer, int32_t tpagIndex) {
@@ -1941,23 +1955,33 @@ static uint32_t glSpriteGetTexture(Renderer* renderer, int32_t tpagIndex) {
     GLuint texId;
     int32_t texW, texH;
     if (!resolveSpriteTexture(gl, tpagIndex, &tpag, &texId, &texW, &texH)) return 0;
-
-    return texId;
+    return (uint32_t) (tpagIndex + 1);
 }
 
-static void glTextureSetStage(Renderer* renderer, int32_t slot, uint32_t texID) {
+// Decode a texture handle produced by glSpriteGetTexture back into its page GL id and tpag.
+// Returns false for the 0 ("no texture") handle or an unresolvable one.
+static bool glResolveTextureHandle(GLRenderer* gl, uint32_t texHandle, TexturePageItem** outTpag, GLuint* outTexId, int32_t* outTexW, int32_t* outTexH) {
+    if (texHandle == 0) return false;
+    return resolveSpriteTexture(gl, (int32_t) texHandle - 1, outTpag, outTexId, outTexW, outTexH);
+}
+
+static void glTextureSetStage(Renderer* renderer, int32_t slot, uint32_t texHandle) {
     GLRenderer* gl = (GLRenderer*) renderer;
     flushBatch(gl);
     if (slot < 0) {
         fprintf(stderr, "GL: Invalid Texture Stage\n");
         return;
     }
+    TexturePageItem* tpag;
+    GLuint texID = 0;
+    int32_t texW, texH;
+    glResolveTextureHandle(gl, texHandle, &tpag, &texID, &texW, &texH);
     if (slot == 0) {
-    gl->currentTextureId = texID;  
+    gl->currentTextureId = texID;
     }
     if (slot > MAX_TEXTURE_STAGES) {
         fprintf(stderr, "GL: Texture Stage Higher Than Max\n");
-        return;  
+        return;
     }
     glActiveTexture(GL_TEXTURE0 + slot);
     glBindTexture(GL_TEXTURE_2D, texID);
@@ -1966,7 +1990,7 @@ static void glTextureSetStage(Renderer* renderer, int32_t slot, uint32_t texID) 
 }
 
 // Look up a texture's pixel size from the renderer's own tables.
-static bool lookupTextureSize(GLRenderer* gl, uint32_t texID, int32_t* outW, int32_t* outH) {
+MAYBE_UNUSED static bool lookupTextureSize(GLRenderer* gl, uint32_t texID, int32_t* outW, int32_t* outH) {
     repeat(gl->textureCount, i) {
         if (gl->textureLoaded[i] && gl->glTextures[i] == (GLuint) texID) {
             *outW = gl->textureWidths[i];
@@ -1986,18 +2010,37 @@ static bool lookupTextureSize(GLRenderer* gl, uint32_t texID, int32_t* outW, int
     return false;
 }
 
-static float glTextureGetTexelWidth(Renderer* renderer, uint32_t texID) {
+static float glTextureGetTexelWidth(Renderer* renderer, uint32_t texHandle) {
     GLRenderer* gl = (GLRenderer*) renderer;
+    TexturePageItem* tpag;
+    GLuint texId;
     int32_t width = 0, height = 0;
-    if (!lookupTextureSize(gl, texID, &width, &height) || 0 >= width) return 1.0f;
+    if (!glResolveTextureHandle(gl, texHandle, &tpag, &texId, &width, &height) || 0 >= width) return 1.0f;
     return 1.0f / (float) width;
 }
 
-static float glTextureGetTexelHeight(Renderer* renderer, uint32_t texID) {
+static float glTextureGetTexelHeight(Renderer* renderer, uint32_t texHandle) {
     GLRenderer* gl = (GLRenderer*) renderer;
+    TexturePageItem* tpag;
+    GLuint texId;
     int32_t width = 0, height = 0;
-    if (!lookupTextureSize(gl, texID, &width, &height) || 0 >= height) return 1.0f;
+    if (!glResolveTextureHandle(gl, texHandle, &tpag, &texId, &width, &height) || 0 >= height) return 1.0f;
     return 1.0f / (float) height;
+}
+
+static bool glTextureGetUVs(Renderer* renderer, uint32_t texHandle, float* outUVs) {
+    GLRenderer* gl = (GLRenderer*) renderer;
+    TexturePageItem* tpag;
+    GLuint texId;
+    int32_t width = 0, height = 0;
+    if (!glResolveTextureHandle(gl, texHandle, &tpag, &texId, &width, &height) || 0 >= width || 0 >= height) return false;
+    float divW = 1.0f / (float) width;
+    float divH = 1.0f / (float) height;
+    outUVs[0] = (float) tpag->sourceX * divW;                              // left
+    outUVs[1] = (float) tpag->sourceY * divH;                             // top
+    outUVs[2] = outUVs[0] + (float) tpag->sourceWidth * divW;            // right
+    outUVs[3] = outUVs[1] + (float) tpag->sourceHeight * divH;           // bottom
+    return true;
 }
 
 static bool glShaderIsCompiled(Renderer* renderer, int32_t shaderID) {
@@ -2069,9 +2112,11 @@ Renderer* GLRenderer_create(void) {
     glVtable.gpuResetShader = glGpuResetShader,
     glVtable.shaderGetUniform = glShaderGetUniform,
     glVtable.shaderSetUniformF = glShaderSetUniformF,
+    glVtable.shaderSetUniformI = glShaderSetUniformI,
     glVtable.spriteGetTexture = glSpriteGetTexture,
     glVtable.textureGetTexelWidth = glTextureGetTexelWidth,
     glVtable.textureGetTexelHeight = glTextureGetTexelHeight,
+    glVtable.textureGetUVs = glTextureGetUVs,
     glVtable.shaderGetSamplerIndex = glShaderGetSamplerIndex,
     glVtable.textureSetStage = glTextureSetStage,
     glVtable.shaderIsCompiled = glShaderIsCompiled,

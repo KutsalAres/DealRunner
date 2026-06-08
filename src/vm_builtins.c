@@ -13128,6 +13128,20 @@ static RValue builtin_shader_set_uniformF(VMContext* ctx, MAYBE_UNUSED RValue* a
     return RValue_makeUndefined();
 }
 
+static RValue builtin_shader_set_uniformI(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    int32_t handle = (int32_t) RValue_toReal(args[0]);
+    if (ctx->runner->renderer->vtable->shaderSetUniformI != nullptr) {
+        int32_t value1 = 0, value2 = 0, value3 = 0, value4 = 0;
+        int32_t count = argCount - 1;
+        if (count >= 1) value1 = (int32_t) RValue_toReal(args[1]);
+        if (count >= 2) value2 = (int32_t) RValue_toReal(args[2]);
+        if (count >= 3) value3 = (int32_t) RValue_toReal(args[3]);
+        if (count >= 4) value4 = (int32_t) RValue_toReal(args[4]);
+        ctx->runner->renderer->vtable->shaderSetUniformI(ctx->runner->renderer, handle, count, value1, value2, value3, value4);
+    }
+    return RValue_makeUndefined();
+}
+
 static RValue builtin_sprite_get_uvs(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
     int32_t spriteIndex = (int32_t) RValue_toReal(args[0]);
     int32_t subimg = RValue_toInt32(args[1]);
@@ -13228,6 +13242,21 @@ static RValue builtin_texture_get_texel_height(VMContext* ctx, MAYBE_UNUSED RVal
 
     uint32_t texID = (uint32_t) RValue_toReal(args[0]);
     return RValue_makeReal(ctx->runner->renderer->vtable->textureGetTexelHeight(ctx->runner->renderer, texID));
+}
+
+static RValue builtin_texture_get_uvs(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
+    uint32_t texID = (uint32_t) RValue_toReal(args[0]);
+    // Default to the full page (0,0,1,1) if the renderer can't resolve the handle.
+    float uvs[4] = { 0.0f, 0.0f, 1.0f, 1.0f };
+    if (ctx->runner->renderer->vtable->textureGetUVs != nullptr) {
+        ctx->runner->renderer->vtable->textureGetUVs(ctx->runner->renderer, texID, uvs);
+    }
+    GMLArray* out = GMLArray_create(4);
+    *GMLArray_slot(out, 0) = RValue_makeReal(uvs[0]);
+    *GMLArray_slot(out, 1) = RValue_makeReal(uvs[1]);
+    *GMLArray_slot(out, 2) = RValue_makeReal(uvs[2]);
+    *GMLArray_slot(out, 3) = RValue_makeReal(uvs[3]);
+    return RValue_makeArray(out);
 }
 
 // ===[ REGISTRATION ]===
@@ -14105,11 +14134,13 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "shaders_are_supported", builtin_shaders_are_supported);  
     VM_registerBuiltin(ctx, "shader_get_uniform", builtin_shader_get_uniform);
     VM_registerBuiltin(ctx, "shader_get_sampler_index", builtin_shader_get_sampler_index);
-    VM_registerBuiltin(ctx, "shader_set_uniform_f", builtin_shader_set_uniformF); 
+    VM_registerBuiltin(ctx, "shader_set_uniform_f", builtin_shader_set_uniformF);
+    VM_registerBuiltin(ctx, "shader_set_uniform_i", builtin_shader_set_uniformI);
     VM_registerBuiltin(ctx, "sprite_get_uvs", builtin_sprite_get_uvs);
     VM_registerBuiltin(ctx, "sprite_get_texture", builtin_sprite_get_texture);
     VM_registerBuiltin(ctx, "font_get_uvs", builtin_font_get_uvs);   
     VM_registerBuiltin(ctx, "texture_get_texel_width", builtin_texture_get_texel_width);
     VM_registerBuiltin(ctx, "texture_get_texel_height", builtin_texture_get_texel_height);
+    VM_registerBuiltin(ctx, "texture_get_uvs", builtin_texture_get_uvs);
     VM_registerBuiltin(ctx, "texture_set_stage", builtin_texture_set_stage);
 }

@@ -127,9 +127,13 @@ typedef struct {
     int32_t (*shaderGetUniform)(Renderer* renderer, int32_t shaderIndex, char* uniform);
     int32_t (*shaderGetSamplerIndex)(Renderer* renderer, int32_t shaderIndex, char* uniform);
     void (*shaderSetUniformF)(Renderer* renderer, int32_t handle, int32_t count, float value1, float value2, float value3, float value4);
+    void (*shaderSetUniformI)(Renderer* renderer, int32_t handle, int32_t count, int32_t value1, int32_t value2, int32_t value3, int32_t value4);
+    // Returns a texture pointer for a specific sprite, where 0 = "no texture".
     uint32_t (*spriteGetTexture)(Renderer* renderer, int32_t tpagIndex);
     float (*textureGetTexelWidth)(Renderer* renderer, uint32_t texID);
     float (*textureGetTexelHeight)(Renderer* renderer, uint32_t texID);
+    // Fills outUVs[0..3] with the texture sub-region on its page (left, top, right, bottom). Returns false if the handle can't be resolved.
+    bool (*textureGetUVs)(Renderer* renderer, uint32_t texID, float* outUVs);
     void (*textureSetStage)(Renderer* renderer, int32_t slot, uint32_t texID);
     bool (*shaderIsCompiled)(Renderer* renderer, int32_t shader);
     bool (*shadersSupported)(Renderer* renderer);
