@@ -14,6 +14,10 @@ set(PLATFORM "desktop" CACHE STRING "Platform backend")
 set(DESKTOP_BACKEND "" CACHE STRING "Desktop platform backend")
 set(AUDIO_BACKEND "" CACHE STRING "Audio backend")
 
+if(PLATFORM STREQUAL "desktop" AND DESKTOP_BACKEND STREQUAL "")
+    message(FATAL_ERROR "You need to set a DESKTOP_BACKEND!")
+endif()
+
 # Build metadata
 set(BUTTERSCOTCH_COMMIT_HASH "unknown" CACHE STRING "Git commit hash")
 set(BUTTERSCOTCH_COMMIT_DATE "unknown" CACHE STRING "Git commit date")
