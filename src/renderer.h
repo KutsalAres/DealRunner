@@ -103,7 +103,6 @@ typedef struct {
     void (*gpuSetFog)(Renderer* renderer, bool enable, uint32_t color);
     // Optional: platform-specific tile rendering (nullptr = use default drawSpritePart path)
     void (*drawTile)(Renderer* renderer, RoomTile* tile, float offsetX, float offsetY);
-    // Optional: platform-specific tiled draw (nullptr = use default per-tile drawSprite loop).
     void (*drawTiled)(Renderer* renderer, int32_t tpagIndex, float originX, float originY, float x, float y, float xscale, float yscale, bool tileX, bool tileY, float roomW, float roomH, uint32_t color, float alpha);
     // Surface Functions
     int32_t (*createSurface)(Renderer* renderer, int32_t width, int32_t height);
@@ -519,54 +518,12 @@ static inline int32_t Renderer_resolveObjectTPAGIndex(DataWin* dataWin, RoomTile
         return Renderer_resolveSpriteTPAGIndex(dataWin, tile->backgroundDefinition);
 }
 
-// Tiled draws.
-// This will use a specialized vtable->drawTiled implementation, but if it doesn't, it will fall back to "manual" tiled rendering.
-static inline void Renderer_drawTiled(Renderer* renderer, int32_t tpagIndex, float originX, float originY, float x, float y, float xscale, float yscale, bool tileX, bool tileY, float roomW, float roomH, uint32_t color, float alpha) {
-    // Use the renderer's fast drawTiled path if it has one
-    if (renderer->vtable->drawTiled != nullptr) {
-        renderer->vtable->drawTiled(renderer, tpagIndex, originX, originY, x, y, xscale, yscale, tileX, tileY, roomW, roomH, color, alpha);
-        return;
-    }
-
-    TexturePageItem* tpag = &renderer->dataWin->tpag.items[tpagIndex];
-
-    float axScale = fabsf(xscale);
-    float ayScale = fabsf(yscale);
-    float tileW = (float) tpag->boundingWidth * axScale;
-    float tileH = (float) tpag->boundingHeight * ayScale;
-    if (0 >= tileW || 0 >= tileH) return;
-
-    float startX, endX, startY, endY;
-    if (tileX) {
-        startX = fmodf(x - originX * axScale, tileW);
-        if (startX > 0) startX -= tileW;
-        endX = roomW;
-    } else {
-        startX = x - originX * axScale;
-        endX = startX + tileW;
-    }
-    if (tileY) {
-        startY = fmodf(y - originY * ayScale, tileH);
-        if (startY > 0) startY -= tileH;
-        endY = roomH;
-    } else {
-        startY = y - originY * ayScale;
-        endY = startY + tileH;
-    }
-
-    for (float dy = startY; endY > dy; dy += tileH) {
-        for (float dx = startX; endX > dx; dx += tileW) {
-            renderer->vtable->drawSprite(renderer, tpagIndex, dx + originX * axScale, dy + originY * ayScale, originX, originY, xscale, yscale, 0.0f, color, alpha);
-        }
-    }
-}
-
 // Draws a tiled background
 static inline void Renderer_drawBackgroundTiled(Renderer* renderer, int32_t tpagIndex, float bgX, float bgY, float xscale, float yscale, bool tileX, bool tileY, float roomW, float roomH, float alpha) {
     DataWin* dw = renderer->dataWin;
     if (0 > tpagIndex || (uint32_t) tpagIndex >= dw->tpag.count) return;
 
-    Renderer_drawTiled(renderer, tpagIndex, 0.0f, 0.0f, bgX, bgY, xscale, yscale, tileX, tileY, roomW, roomH, 0xFFFFFFu, alpha);
+    renderer->vtable->drawTiled(renderer, tpagIndex, 0.0f, 0.0f, bgX, bgY, xscale, yscale, tileX, tileY, roomW, roomH, 0xFFFFFFu, alpha);
 }
 
 // Draws a tiled sprite across the room
@@ -579,7 +536,7 @@ static inline void Renderer_drawSpriteTiled(Renderer* renderer, int32_t spriteIn
     float originX = (float) sprite->originX;
     float originY = (float) sprite->originY;
 
-    Renderer_drawTiled(renderer, tpagIndex, originX, originY, x, y, xscale, yscale, true, true, roomW, roomH, color, alpha);
+    renderer->vtable->drawTiled(renderer, tpagIndex, originX, originY, x, y, xscale, yscale, true, true, roomW, roomH, color, alpha);
 }
 
 // Default draw: draws instance's sprite using its image_* properties

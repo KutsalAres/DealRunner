@@ -1940,6 +1940,7 @@ static void validateRendererVtable(Renderer* renderer) {
     requireNotNullFunction(drawLineColor);
     requireNotNullFunction(drawText);
     requireNotNullFunction(drawTextColor);
+    requireNotNullFunction(drawTiled);
     requireNotNullFunction(flush);
     requireNotNullFunction(clearScreen);
     requireNotNullFunction(createSpriteFromSurface);

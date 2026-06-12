@@ -9047,7 +9047,7 @@ static RValue builtin_draw_background_tiled(VMContext* ctx, RValue* args, MAYBE_
 
     float roomW = (float) runner->currentRoom->width;
     float roomH = (float) runner->currentRoom->height;
-    Renderer_drawTiled(runner->renderer, tpagIndex, 0.0f, 0.0f, x, y, 1.0f, 1.0f, true, true, roomW, roomH, 0xFFFFFFu, runner->renderer->drawAlpha);
+    runner->renderer->vtable->drawTiled(runner->renderer, tpagIndex, 0.0f, 0.0f, x, y, 1.0f, 1.0f, true, true, roomW, roomH, 0xFFFFFFu, runner->renderer->drawAlpha);
     return RValue_makeUndefined();
 }
 
@@ -9068,7 +9068,7 @@ static RValue builtin_draw_background_tiled_ext(VMContext* ctx, RValue* args, MA
 
     float roomW = (float) runner->currentRoom->width;
     float roomH = (float) runner->currentRoom->height;
-    Renderer_drawTiled(runner->renderer, tpagIndex, 0.0f, 0.0f, x, y, xscale, yscale, true, true, roomW, roomH, color, alpha);
+    runner->renderer->vtable->drawTiled(runner->renderer, tpagIndex, 0.0f, 0.0f, x, y, xscale, yscale, true, true, roomW, roomH, color, alpha);
     return RValue_makeUndefined();
 }
 
