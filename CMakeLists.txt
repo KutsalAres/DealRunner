@@ -136,8 +136,10 @@ target_sources(butterscotch PRIVATE vendor/md5/md5.c)
 target_include_directories(butterscotch PUBLIC vendor/md5)
 
 # Steve Reid's SHA1 implementation
-target_sources(butterscotch PRIVATE vendor/sha1/sha1.c)
-target_include_directories(butterscotch PUBLIC vendor/sha1)
+add_library(sha1 STATIC vendor/sha1/sha1.c)
+target_include_directories(sha1 SYSTEM PUBLIC vendor/sha1)
+target_compile_options(sha1 PRIVATE -w)
+target_link_libraries(butterscotch PRIVATE sha1)
 
 # Base64 implementation
 target_sources(butterscotch PRIVATE vendor/base64/base64.c)
@@ -277,7 +279,7 @@ if(PLATFORM STREQUAL "desktop")
         target_link_directories(butterscotch PRIVATE ${SDL2_LIBRARY_DIRS})
         set(BACKEND_LIBRARIES ${SDL2_LIBRARIES})
     endif()
-    target_link_libraries(butterscotch ${BACKEND_LIBRARIES} ${AUDIO_LIBRARIES} ${PLATFORM_LIBRARIES})
+    target_link_libraries(butterscotch PRIVATE ${BACKEND_LIBRARIES} ${AUDIO_LIBRARIES} ${PLATFORM_LIBRARIES})
     target_sources(butterscotch PRIVATE src/desktop/backends/${DESKTOP_BACKEND}.c)
 
     # Enable AddressSanitizer by default in Debug builds
