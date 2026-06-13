@@ -751,25 +751,16 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
         ptrdiff_t mapIdx = shgeti(ctx->codeIndexByName, varDef->name);
         if (mapIdx >= 0) {
             int32_t codeIndex = ctx->codeIndexByName[mapIdx].value;
-            return RValue_makeMethod(codeIndex, -1);
+            return RValue_makeMethodFromCodeIndexAndInstanceId(codeIndex, -1);
         }
         // Then try registered built-ins
-        RValue rv = {0};
         ptrdiff_t bidx = shgeti(ctx->builtinMap, (char*) varDef->name);
         if (bidx >= 0) {
             BuiltinFunc bf = ctx->builtinMap[bidx].value;
-            rv.type = RVALUE_METHOD;
-            rv.ownsReference = true;
-            rv.gmlStackType = GML_TYPE_VARIABLE;
-            rv.method = GMLMethod_createBuiltin(bf, -1);
-            return rv;
+            return RValue_makeMethod(GMLMethod_createBuiltin(bf, -1));
         }
         // Unresolved: return a method stub so CallV can log a single "unknown function" and return undefined instead of bailing out with a scary "unresolvable function reference" error.
-        rv.type = RVALUE_METHOD;
-        rv.ownsReference = true;
-        rv.gmlStackType = GML_TYPE_VARIABLE;
-        rv.method = GMLMethod_createUnresolved(varDef->name, -1);
-        return rv;
+        return RValue_makeMethod(GMLMethod_createUnresolved(varDef->name, -1));
     }
 #endif
 
@@ -2778,19 +2769,17 @@ static void handleBreakPushRef(VMContext* ctx, const uint8_t* extraData) {
         if (ctx->dataWin->func.functionCount > (uint32_t) index) {
             FuncCallCache* cache = &ctx->funcCallCache[index];
             if (cache->scriptCodeIndex >= 0) {
-                stackPushTyped(ctx, RValue_makeMethod(cache->scriptCodeIndex, -1), GML_TYPE_VARIABLE);
+                stackPushTyped(ctx, RValue_makeMethodFromCodeIndexAndInstanceId(cache->scriptCodeIndex, -1), GML_TYPE_VARIABLE);
                 return;
             }
-            RValue rv = {0};
-            rv.type = RVALUE_METHOD;
-            rv.ownsReference = true;
-            rv.gmlStackType = GML_TYPE_VARIABLE;
+            GMLMethod* method;
             if (cache->builtin != nullptr) {
-                rv.method = GMLMethod_createBuiltin((BuiltinFunc) cache->builtin, -1);
+                method = GMLMethod_createBuiltin((BuiltinFunc) cache->builtin, -1);
             } else {
-                rv.method = GMLMethod_createUnresolved(ctx->dataWin->func.functions[index].name, -1);
+                method = GMLMethod_createUnresolved(ctx->dataWin->func.functions[index].name, -1);
             }
-            stackPushTyped(ctx, rv, GML_TYPE_VARIABLE);
+
+            stackPushTyped(ctx, RValue_makeMethod(method), GML_TYPE_VARIABLE);
         } else {
             stackPushTyped(ctx, RValue_makeUndefined(), GML_TYPE_VARIABLE);
         }

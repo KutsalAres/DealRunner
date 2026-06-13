@@ -3834,7 +3834,7 @@ static RValue builtin_method(VMContext* ctx, MAYBE_UNUSED RValue* args, int32_t 
         boundInstance = ctx->currentInstance->instanceId;
     }
 
-    return RValue_makeMethod(codeIndex, boundInstance);
+    return RValue_makeMethodFromCodeIndexAndInstanceId(codeIndex, boundInstance);
 }
 #endif
 

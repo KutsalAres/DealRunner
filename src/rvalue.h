@@ -184,13 +184,18 @@ static inline RValue RValue_makeArrayWeak(GMLArray* arr) {
 
 #if IS_WAD17_OR_HIGHER_ENABLED
 // Takes ownership: refCount is NOT bumped (caller hands off its ref). The returned RValue decRefs on free.
-static inline RValue RValue_makeMethod(int32_t codeIndex, int32_t boundInstanceId) {
+static inline RValue RValue_makeMethod(GMLMethod* gmlMethod) {
     RValue rv = {0};
     rv.type = RVALUE_METHOD;
     rv.ownsReference = true;
     rv.gmlStackType = GML_TYPE_VARIABLE;
-    rv.method = GMLMethod_create(codeIndex, boundInstanceId);
+    rv.method = gmlMethod;
     return rv;
+}
+
+// Takes ownership: refCount is NOT bumped (caller hands off its ref). The returned RValue decRefs on free.
+static inline RValue RValue_makeMethodFromCodeIndexAndInstanceId(int32_t codeIndex, int32_t boundInstanceId) {
+    return RValue_makeMethod(GMLMethod_create(codeIndex, boundInstanceId));
 }
 
 // Weak view: does not own (no decRef on free). Callers that stash the value long-term must incRef + set ownsString.
