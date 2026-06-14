@@ -7641,6 +7641,18 @@ static RValue builtin_instance_deactivate_region(VMContext* ctx, RValue* args, i
     return RValue_makeUndefined();
 }
 
+// instance_id_get(index) - gets the instance ID of a specific instance index
+static RValue builtin_instance_id_get(VMContext* ctx, MAYBE_UNUSED RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeReal(0.0);
+    int32_t index = RValue_toInt32(args[0]);
+    Runner* runner = ctx->runner;
+
+    if (0 > index || index >= arrlen(runner->instances))
+        return RValue_makeReal(INSTANCE_NOONE); // Tested against GameMaker 2026.0.0.23
+
+    return RValue_makeReal(runner->instances[index]->instanceId);
+}
+
 static RValue builtin_event_inherited(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
     Runner* runner = ctx->runner;
     Instance* inst = ctx->currentInstance;
@@ -15188,6 +15200,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "instance_deactivate_region", builtin_instance_deactivate_region);
     VM_registerBuiltin(ctx, "instance_activate_layer", builtin_instance_activate_layer);
     VM_registerBuiltin(ctx, "instance_deactivate_layer", builtin_instance_deactivate_layer);
+    VM_registerBuiltin(ctx, "instance_id_get", builtin_instance_id_get);
     if (!isGMS2) {
         VM_registerBuiltin(ctx, "action_kill_object", builtin_action_kill_object);
         VM_registerBuiltin(ctx, "action_create_object", builtin_action_create_object);
