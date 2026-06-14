@@ -34,6 +34,25 @@
 
 #define MAX_BACKGROUNDS 8
 
+// See GameMaker-HTML's Function_Layers.js
+#define TILEINHERIT_SHIFT 31
+#define TILEFLIP_SHIFT 29
+#define TILEMIRROR_SHIFT 28
+#define TILEROTATE_SHIFT 30
+
+#define TILEINHERIT_MASK (1 << TILEINHERIT_SHIFT) // don't care about this bit in the runner
+#define TILEFLIP_MASK (1 << TILEFLIP_SHIFT)
+#define TILEMIRROR_MASK (1 << TILEMIRROR_SHIFT)
+#define TILEROTATE_MASK (1 << TILEROTATE_SHIFT)
+
+#define TILESCALEROT_SHIFT TILEMIRROR_SHIFT
+#define TILESCALEROT_MASK (0x7 << TILESCALEROT_SHIFT)
+#define TILESCALEROT_SHIFTEDMASK 0x7
+
+#define TILEINDEX_SHIFT 0
+#define TILEINDEX_MASK (0x7ffff << TILEINDEX_SHIFT)
+#define TILEINDEX_SHIFTEDMASK (0x7ffff)
+
 // ===[ STUBS MACROS ]===
 
 #define STUB_RETURN_ZERO(name) \
@@ -12808,7 +12827,7 @@ static RValue builtin_tilemap_set_at_pixel(VMContext* ctx, RValue* args, MAYBE_U
     if (0 > cellIndex) return RValue_makeBool(false);
 
     uint32_t cell = (uint32_t) RValue_toInt32(args[1]);
-    uint32_t tileIndex = cell & 0x7ffff;
+    uint32_t tileIndex = cell & TILEINDEX_SHIFTEDMASK;
     if (tileset->gms2TileCount != 0 && tileIndex >= tileset->gms2TileCount) {
         fprintf(stderr, "VM: [%s] tilemap_set_at_pixel() - tile index outside tile set count\n", ctx->currentCodeName);
         return RValue_makeBool(false);
@@ -12828,17 +12847,37 @@ static RValue builtin_tilemap_get_tileset(VMContext* ctx, RValue* args, MAYBE_UN
 }
 
 // tile_get_index(tiledata): extracts the tileset cell index from a raw tile cell value, masking off the mirror/flip/rotate bits.
-// (see GameMaker-HTML5 Function_Layers.js: TileIndex_Mask = 0x7ffff, TileIndex_Shift = 0)
 static RValue builtin_tile_get_index(MAYBE_UNUSED VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
     if (1 > argCount) return RValue_makeReal(-1.0);
-    return RValue_makeReal((GMLReal) (RValue_toInt32(args[0]) & 0x7ffff));
+    return RValue_makeReal((GMLReal) (RValue_toInt32(args[0]) & TILEINDEX_SHIFTEDMASK));
+}
+
+// tile_get_mirror(tiledata): returns whether the horizontal-mirror bit is set on a raw tile cell value.
+// (see GameMaker-HTML5 Function_Layers.js)
+static RValue builtin_tile_get_mirror(MAYBE_UNUSED VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    if (1 > argCount) return RValue_makeBool(false);
+    return RValue_makeBool((RValue_toInt32(args[0]) & (1 << 28)) != 0);
+}
+
+// tile_get_flip(tiledata): returns whether the vertical-flip bit is set on a raw tile cell value.
+// (see GameMaker-HTML5 Function_Layers.js)
+static RValue builtin_tile_get_flip(MAYBE_UNUSED VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    if (1 > argCount) return RValue_makeBool(false);
+    return RValue_makeBool((RValue_toInt32(args[0]) & (1 << 29)) != 0);
+}
+
+// tile_get_rotate(tiledata): returns whether the 90-degree-rotate bit is set on a raw tile cell value.
+// (see GameMaker-HTML5 Function_Layers.js)
+static RValue builtin_tile_get_rotate(MAYBE_UNUSED VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    if (1 > argCount) return RValue_makeBool(false);
+    return RValue_makeBool((RValue_toInt32(args[0]) & TILEROTATE_MASK) != 0);
 }
 
 // tile_set_empty(tiledata): clears the tileset cell index from a raw tile cell value, keeping the mirror/flip/rotate bits.
 // (see GameMaker-HTML5 Function_Layers.js tile_set_empty)
 static RValue builtin_tile_set_empty(MAYBE_UNUSED VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
     if (1 > argCount) return RValue_makeReal(-1.0);
-    return RValue_makeReal((GMLReal) (RValue_toInt32(args[0]) & ~0x7ffff));
+    return RValue_makeReal((GMLReal) (RValue_toInt32(args[0]) & ~TILEINDEX_SHIFTEDMASK));
 }
 
 static RValue builtin_layer_get_all(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE_UNUSED int32_t argCount) {
@@ -15547,6 +15586,9 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "tilemap_get_at_pixel", builtin_tilemap_get_at_pixel);
     VM_registerBuiltin(ctx, "tilemap_get_tileset", builtin_tilemap_get_tileset);
     VM_registerBuiltin(ctx, "tile_get_index", builtin_tile_get_index);
+    VM_registerBuiltin(ctx, "tile_get_mirror", builtin_tile_get_mirror);
+    VM_registerBuiltin(ctx, "tile_get_flip", builtin_tile_get_flip);
+    VM_registerBuiltin(ctx, "tile_get_rotate", builtin_tile_get_rotate);
     VM_registerBuiltin(ctx, "tile_set_empty", builtin_tile_set_empty);
     VM_registerBuiltin(ctx, "tilemap_set_at_pixel", builtin_tilemap_set_at_pixel);
 #endif
