@@ -8819,6 +8819,39 @@ static RValue builtin_buffer_sha1(MAYBE_UNUSED VMContext* ctx, RValue* args, MAY
     return RValue_makeOwnedString(hex);
 }
 
+// sha1_file(file) - hex string (40 chars, lowercase).
+static RValue builtin_sha1_file(MAYBE_UNUSED VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    Runner* runner = ctx->runner;
+    FileSystem* fs = runner->fileSystem;
+
+    char* filePath = RValue_toString(args[0]);
+    const char* resolvedPath = fs->vtable->resolvePath(fs, filePath);
+    uint8_t* fileData = nullptr;
+    int32_t fileSize = 0;
+    bool ok = fs->vtable->readFileBinary(fs, resolvedPath, &fileData, &fileSize);
+    free(filePath);
+
+    // GameMaker 2023.4.0.113 returns an empty string if the file doesn't exist
+    if (!ok)
+        return RValue_makeString("");
+
+    SHA1_CTX sctx;
+    SHA1Init(&sctx);
+    if (fileSize > 0)
+        SHA1Update(&sctx, fileData, (unsigned int) fileSize);
+
+    unsigned char digest[20];
+    SHA1Final(digest, &sctx);
+
+    char* hex = safeMalloc(41);
+    for (int32_t i = 0; 20 > i; i++) {
+        sprintf(&hex[i * 2], "%02x", digest[i]);
+    }
+    hex[40] = '\0';
+
+    return RValue_makeOwnedString(hex);
+}
+
 // buffer_get_surface(buffer, surface, offset) -> bool
 // Reads RGBA8 pixels from the surface into the buffer at the given offset.
 static RValue builtin_buffer_get_surface(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
@@ -15343,6 +15376,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "buffer_md5", builtin_buffer_md5);
     VM_registerBuiltin(ctx, "buffer_sha1", builtin_buffer_sha1);
     VM_registerBuiltin(ctx, "buffer_get_surface", builtin_buffer_get_surface);
+    VM_registerBuiltin(ctx, "sha1_file", builtin_sha1_file);
 
     // PSN
     VM_registerBuiltin(ctx, "psn_init", builtin_psn_init);
