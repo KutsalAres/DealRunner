@@ -14096,6 +14096,17 @@ static RValue builtin_object_get_sprite(VMContext* ctx, RValue* args, int32_t ar
     return RValue_makeReal(ctx->dataWin->objt.objects[id].spriteId);
 }
 
+static RValue builtin_object_get_visible(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeBool(false);
+
+    int32_t id = RValue_toInt32(args[0]);
+    if (0 > id || (uint32_t) id >= ctx->dataWin->objt.count) {
+        return RValue_makeBool(false);
+    }
+
+    return RValue_makeBool(ctx->dataWin->objt.objects[id].visible);
+}
+
 static RValue builtin_object_get_depth(VMContext* ctx, RValue* args, int32_t argCount) {
     if (1 > argCount) return RValue_makeReal(0.0);
 
