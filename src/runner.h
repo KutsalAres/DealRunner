@@ -178,8 +178,7 @@ typedef struct {
     float offsetY;
 } TileLayerState;
 
-// Mutable background element on a dynamically-created layer (layer_background_create).
-// For parsed room layers, RoomLayerBackgroundData is used directly and this struct is unused.
+// Runtime background element on a layer
 typedef struct {
     int32_t spriteIndex; // SPRT index (-1 = none)
     bool visible;
@@ -224,8 +223,7 @@ typedef struct {
     bool visible;
     float alpha; // GameMaker-HTML5's m_imageAlpha
     uint32_t blend; // GameMaker-HTML5's m_imageBlend
-    RuntimeBackgroundElement* backgroundElement; // owned; only set for Background elements created via layer_background_create
-    RoomLayerBackgroundData* parsedBackgroundData; // borrowed, points into the parsed RoomLayer; only set for a parsed Background layer's element
+    RuntimeBackgroundElement* backgroundElement; // owned; set for every background element
     RuntimeSpriteElement* spriteElement; // owned; nullptr if type != Sprite
     RoomTile* tileElement; // borrowed, points into RoomLayerAssetsData->legacyTiles; nullptr if type != Tile
     RoomLayerTilesData* tilemapData; // borrowed, points into the parsed RoomLayer; nullptr if type != Tilemap

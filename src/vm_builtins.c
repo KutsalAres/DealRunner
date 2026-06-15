@@ -12268,14 +12268,6 @@ static RuntimeBackgroundElement* findBackgroundElement(Runner* runner, int32_t e
     return el->backgroundElement;
 }
 
-// Resolves a background element id to a parsed Background layer's data.
-static RoomLayerBackgroundData* findParsedBackgroundData(Runner* runner, int32_t elementId) {
-    RuntimeLayerElement* el = Runner_findLayerElementById(runner, elementId, nullptr);
-    if (el == nullptr || el->type != RuntimeLayerElementType_Background)
-        return nullptr;
-    return el->parsedBackgroundData;
-}
-
 // Resolves a tilemap element id to its tiles data + owning runtime layer.
 static RoomLayerTilesData* findTilemapData(Runner* runner, int32_t elementId, RuntimeLayer** outLayer) {
     if (outLayer != nullptr) *outLayer = nullptr;
@@ -12287,11 +12279,9 @@ static RoomLayerTilesData* findTilemapData(Runner* runner, int32_t elementId, Ru
     return el->tilemapData;
 }
 
-#define setBackgroundLayerField(id, parsedParameter, targetParameter) \
+#define setBackgroundLayerField(id, value, targetParameter) \
     RuntimeBackgroundElement* bg = findBackgroundElement(runner, id); \
-    if (bg != nullptr) bg->targetParameter = parsedParameter; \
-    RoomLayerBackgroundData* parsed = findParsedBackgroundData(runner, id); \
-    if (parsed != nullptr) parsed->targetParameter = parsedParameter;
+    if (bg != nullptr) bg->targetParameter = value;
 
 static RValue builtin_layer_background_visible(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
     Runner* runner = ctx->runner;
@@ -12348,9 +12338,6 @@ static RValue builtin_layer_background_blend(VMContext* ctx, RValue* args, MAYBE
     RuntimeBackgroundElement* bg = findBackgroundElement(runner, id);
     if (bg != nullptr)
         bg->blend = blend;
-    RoomLayerBackgroundData* parsed = findParsedBackgroundData(runner, id);
-    if (parsed != nullptr)
-        parsed->color = (parsed->color & 0xFF000000u) | blend;
     return RValue_makeUndefined();
 }
 
@@ -12361,12 +12348,6 @@ static RValue builtin_layer_background_alpha(VMContext* ctx, RValue* args, MAYBE
     RuntimeBackgroundElement* bg = findBackgroundElement(runner, id);
     if (bg != nullptr)
         bg->alpha = alpha;
-    RoomLayerBackgroundData* parsed = findParsedBackgroundData(runner, id);
-    if (parsed != nullptr) {
-        float clamped = alpha < 0.0f ? 0.0f : (alpha > 1.0f ? 1.0f : alpha);
-        uint32_t alphaByte = (uint32_t) (clamped * 255.0f);
-        parsed->color = (parsed->color & 0x00FFFFFFu) | (alphaByte << 24);
-    }
     return RValue_makeUndefined();
 }
 
@@ -12409,9 +12390,6 @@ static RValue builtin_layer_background_get_alpha(VMContext* ctx, RValue* args, M
     RuntimeBackgroundElement* bg = findBackgroundElement(runner, id);
     if (bg != nullptr)
         return RValue_makeReal(bg->alpha);
-    RoomLayerBackgroundData* parsed = findParsedBackgroundData(runner, id);
-    if (parsed != nullptr)
-        return RValue_makeReal((GMLReal) BGR_A(parsed->color) / 255.0);
     return RValue_makeReal(0.0);
 }
 
@@ -12669,11 +12647,6 @@ static RValue builtin_layer_background_destroy(VMContext* ctx, RValue* args, MAY
     if (el->backgroundElement != nullptr) {
         free(el->backgroundElement);
         el->backgroundElement = nullptr;
-    }
-    // The renderer draws parsed Background layers from the parsed data, so destroying the element must hide it there.
-    if (el->parsedBackgroundData != nullptr) {
-        el->parsedBackgroundData->visible = false;
-        el->parsedBackgroundData = nullptr;
     }
 
     // Remove the element from the owning layer's element array to keep lookup + iteration tidy.

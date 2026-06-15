@@ -516,6 +516,19 @@ static void drawBackground(
     }
 }
 
+// Renders a single GM:S 2 background layer element
+static void renderBackgroundElement(Runner* runner, RuntimeBackgroundElement* bg, float roomW, float roomH, float layerOffsetX, float layerOffsetY) {
+    if (bg == nullptr || !bg->visible) return;
+    if (0 > bg->spriteIndex) {
+        // Spriteless background element: draw as a colored rectangle filling the room
+        // TODO: Match GMS's rendering more closely (see PR #120)
+        runner->renderer->vtable->drawRectangle(runner->renderer, 0.0f, 0.0f, roomW, roomH, bg->blend, bg->alpha, false);
+        return;
+    }
+    int32_t tpagIndex = Renderer_resolveTPAGIndex(runner->dataWin, bg->spriteIndex, bg->imageIndex);
+    drawBackground(runner, tpagIndex, bg->stretch, roomW, roomH, bg->hTiled, bg->vTiled, bg->xOffset, bg->yOffset, layerOffsetX, layerOffsetY, bg->xScale, bg->yScale, bg->blend, bg->alpha);
+}
+
 // Legacy GameMaker: Studio 1.x backgrounds
 void Runner_drawBackgrounds(Runner* runner, bool foreground) {
     if (runner->renderer == nullptr) return;
@@ -877,49 +890,20 @@ void Runner_draw(Runner* runner) {
             float layerOffsetX = runtimeLayer->xOffset;
             float layerOffsetY = runtimeLayer->yOffset;
 
-            // Dynamic layers created via layer_create have no parsed RoomLayer, render their runtime elements instead (backgrounds, in the future sprites/tilemaps).
-            if (runtimeLayer->dynamic) {
-                if (runner->renderer == nullptr) continue;
-
-                DataWin* dataWin = runner->dataWin;
+            // Handle layer elements
+            if (runner->renderer != nullptr) {
                 float roomW = (float) runner->currentRoom->width;
                 float roomH = (float) runner->currentRoom->height;
-
                 size_t elementCount = arrlenu(runtimeLayer->elements);
                 repeat(elementCount, j) {
                     RuntimeLayerElement* layerElement = &runtimeLayer->elements[j];
                     if (layerElement->type == RuntimeLayerElementType_Background && layerElement->backgroundElement != nullptr) {
-                        RuntimeBackgroundElement* bg = layerElement->backgroundElement;
-                        if (!bg->visible) continue;
-                        if (0 > bg->spriteIndex) {
-                            // Spriteless background element: draw as a colored rectangle
-                            runner->renderer->vtable->drawRectangle(runner->renderer, 0.0f, 0.0f, roomW, roomH, bg->blend, bg->alpha, false);
-                            continue;
-                        }
-                        int32_t tpagIndex = Renderer_resolveTPAGIndex(dataWin, bg->spriteIndex, bg->imageIndex);
-                        drawBackground(
-                            runner,
-                            tpagIndex,
-                            bg->stretch,
-                            roomW,
-                            roomH,
-                            bg->hTiled,
-                            bg->vTiled,
-                            bg->xOffset,
-                            bg->yOffset,
-                            layerOffsetX,
-                            layerOffsetY,
-                            bg->xScale,
-                            bg->yScale,
-                            bg->blend,
-                            bg->alpha
-                        );
+                        renderBackgroundElement(runner, layerElement->backgroundElement, roomW, roomH, layerOffsetX, layerOffsetY);
                     }
                 }
-                continue;
             }
 
-            // Parsed layer: look up the RoomLayer by ID and render its data-driven content.
+            // Everything after this point is static/parsed layers from the Room itself
             RoomLayer* parsedLayer = Runner_findRoomLayerById(runner->currentRoom, (int32_t) runtimeLayer->id);
             if (parsedLayer == nullptr) continue;
             if (parsedLayer->type == RoomLayerType_Assets) {
@@ -993,46 +977,17 @@ void Runner_draw(Runner* runner) {
                         spr->scaleY, spr->rotation, el->blend,
                         el->alpha);
                 }
-            } else if (parsedLayer->type == RoomLayerType_Background) {
-                if (runner->renderer == nullptr) return;
-                DataWin* dataWin = runner->dataWin;
-                float roomW = (float) runner->currentRoom->width;
-                float roomH = (float) runner->currentRoom->height;
-                RoomLayerBackgroundData* data = parsedLayer->backgroundData;
-                if (!data->visible) continue;
-
-                if (0 > data->spriteIndex) {
-                    // Spriteless background layer: draw as a colored rectangle with the layer's color/alpha
-                    // TODO: Match GMS's renering more closely (see PR #120)
-                    float alpha = (float) BGR_A(data->color) / 255.0f;
-                    runner->renderer->vtable->drawRectangle(runner->renderer, 0.0f, 0.0f, roomW, roomH, data->color, alpha, false);
-                    continue;
-                }
-
-                int32_t tpagIndex = Renderer_resolveTPAGIndex(dataWin, data->spriteIndex, data->imageIndex);
-                drawBackground(
-                    runner,
-                    tpagIndex,
-                    data->stretch,
-                    roomW,
-                    roomH,
-                    data->hTiled,
-                    data->vTiled,
-                    0.0f,
-                    0.0f,
-                    layerOffsetX,
-                    layerOffsetY,
-                    1.0f,
-                    1.0f,
-                    0xFFFFFF,
-                    1.0
-                );
-            } else if(parsedLayer->type == RoomLayerType_Instances) {
-                // Instance depth is assigned from layers during room init (initRoom).
-                // Nothing to do here - instances are drawn from the DRAWABLE_INSTANCE path.
-            } else if(parsedLayer->type == RoomLayerType_Tiles) {
+            } else if (parsedLayer->type == RoomLayerType_Tiles) {
                 if (runner->renderer == nullptr) continue;
                 Runner_drawTileLayer(runner, parsedLayer->tilesData, layerOffsetX, layerOffsetY);
+            } else if (parsedLayer->type == RoomLayerType_Background) {
+                // Nothing to render here: handled above
+            } else if (parsedLayer->type == RoomLayerType_Instances) {
+                // Nothing to render here: handled above on the DRAWABLE_INSTANCE path
+            } else if (parsedLayer->type == RoomLayerType_Path || parsedLayer->type == RoomLayerType_Path2) {
+                // Nothing to render: not used for rendering purposes
+            } else if (parsedLayer->type == RoomLayerType_Effect) {
+                // TODO: Implement post-processing effect layers!
             }
         }
     }
@@ -1481,17 +1436,31 @@ static void initRoom(Runner* runner, int32_t roomIndex) {
     // Watermark: ensure runtime-allocated IDs (layers + elements) stay above parsed IDs.
     if (maxLayerId >= runner->nextLayerId) runner->nextLayerId = maxLayerId + 1;
 
-    // Populate runtime elements for parsed layers.
+    // Convert room layers into runtime elements
     repeat(room->layerCount, i) {
         RoomLayer* layerSource = &room->layers[i];
         if (layerSource->type == RoomLayerType_Background && layerSource->backgroundData != nullptr) {
+            RoomLayerBackgroundData* src = layerSource->backgroundData;
+            RuntimeBackgroundElement* bg = safeMalloc(sizeof(RuntimeBackgroundElement));
+            bg->spriteIndex = src->spriteIndex;
+            bg->visible = src->visible;
+            bg->hTiled = src->hTiled;
+            bg->vTiled = src->vTiled;
+            bg->stretch = src->stretch;
+            bg->xScale = 1.0f;
+            bg->yScale = 1.0f;
+            bg->blend = src->color & 0xFFFFFFu;
+            bg->alpha = (float) BGR_A(src->color) / 255.0f;
+            bg->xOffset = 0.0f;
+            bg->yOffset = 0.0f;
+            bg->imageIndex = src->imageIndex;
             RuntimeLayerElement el = {0};
             el.id = Runner_getNextLayerId(runner);
             el.type = RuntimeLayerElementType_Background;
             el.visible = true;
-            el.alpha = (float) BGR_A(layerSource->backgroundData->color) / 255.0f;
-            el.blend = layerSource->backgroundData->color & 0xFFFFFFu;
-            el.parsedBackgroundData = layerSource->backgroundData;
+            el.alpha = bg->alpha;
+            el.blend = bg->blend;
+            el.backgroundElement = bg;
             arrput(runner->runtimeLayers[i].elements, el);
             continue;
         }
