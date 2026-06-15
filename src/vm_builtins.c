@@ -863,12 +863,24 @@ RValue VMBuiltins_getVariable(VMContext* ctx, Instance* inst, int16_t builtinVar
         case BUILTIN_VAR_ROOM_LAST:
             return RValue_makeReal((GMLReal) runner->dataWin->gen8.roomOrder[runner->dataWin->gen8.roomOrderCount - 1]);
         case BUILTIN_VAR_ROOM_SPEED:
+            if (runner->currentRoom == nullptr)
+                return RValue_makeReal((GMLReal) runner->dataWin->gen8.gms2FPS);
+
             return RValue_makeReal((GMLReal) runner->currentRoom->speed);
         case BUILTIN_VAR_ROOM_WIDTH:
+            if (runner->currentRoom == nullptr)
+                return RValue_makeReal((GMLReal) -1.0);
+
             return RValue_makeReal((GMLReal) runner->currentRoom->width);
         case BUILTIN_VAR_ROOM_HEIGHT:
+            if (runner->currentRoom == nullptr)
+                return RValue_makeReal((GMLReal) -1.0);
+
             return RValue_makeReal((GMLReal) runner->currentRoom->height);
         case BUILTIN_VAR_ROOM_PERSISTENT:
+            if (runner->currentRoom == nullptr)
+                return RValue_makeReal((GMLReal) -1.0);
+
             return RValue_makeBool(runner->currentRoom->persistent);
 
         // View properties
