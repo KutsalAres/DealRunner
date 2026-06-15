@@ -15,9 +15,6 @@
 
 #include "stb_ds.h"
 
-// Maximum number of local variables per code entry (stack-allocated arrays in VM_executeCode/VM_callCodeIndex)
-#define MAX_CODE_LOCALS 128
-
 // ===[ Stack Operations ]===
 
 #ifdef ENABLE_VM_TRACING
@@ -479,16 +476,14 @@ static uint32_t resolveLocalSlot(VMContext* ctx, int32_t varID) {
 
     // BC13/BC14 and BC17+: allocate the slot dynamically because the data.win CANNOT be trusted to know how many localVars the script has
     uint32_t slot = IntIntHashMap_getOrInsertSequential(ctx->currentCodeLocalsSlotMap, varID);
-    // Even though we are dynamically allocating the slots, we are still bound to whatever localVars is allocated to
-    // So, if a script goes over the MAX_CODE_LOCALS, it would cause unforeseen consequences...
-    requireMessage(MAX_CODE_LOCALS > slot, "resolveLocalSlot: exceeded MAX_CODE_LOCALS while allocating a slot for an array-only local");
 
     // Grow this frame's localVars window to cover `slot` whether the entry is pre-existing or freshly allocated.
     // Pre-existing entries can still be past ctx->localVarCount if a nested call to the same code extended the slot map while the outer frame was suspended (the outer frame's localVarCount is captured at call entry and doesn't follow later growth).
     if (slot >= ctx->localVarCount) {
-        for (uint32_t i = ctx->localVarCount; slot >= i; i++) {
-            ctx->localVars[i] = RValue_makeUndefined();
-        }
+        RValue* resizedLocalVars = safeCalloc(slot + 1, sizeof(RValue));
+        memcpy(resizedLocalVars, ctx->localVars, sizeof(RValue) * ctx->localVarCount);
+        free(ctx->localVars);
+        ctx->localVars = resizedLocalVars;
         ctx->localVarCount = slot + 1;
     }
     return slot;
@@ -3463,12 +3458,6 @@ VMContext* VM_create(DataWin* dataWin) {
         rewriteBytecode14To16(ctx);
     }
 
-    // Validate that no code entry exceeds MAX_CODE_LOCALS (the VM uses stack-allocated arrays of this size)
-    repeat(dataWin->code.count, i) {
-        CodeEntry* entry = &dataWin->code.entries[i];
-        requireMessageFormatted(__FILE__, __LINE__, MAX_CODE_LOCALS > entry->localsCount, "Code %s has too many locals!", entry->name);
-    }
-
     VMBuiltins_checkIfBuiltinVarTableIsSorted();
 
     // Pre-resolve built-in variable IDs (replaces runtime strcmp chains with O(1) switch dispatch)
@@ -3724,7 +3713,7 @@ RValue VM_executeCode(VMContext* ctx, int32_t codeIndex) {
     setCurrentCodeLocalsSlotMap(ctx);
 
     uint32_t localsCount = computeLocalsCount(ctx, code);
-    RValue localVars[MAX_CODE_LOCALS] = {0};
+    RValue* localVars = safeCalloc(localsCount, sizeof(RValue));
     ctx->localVars = localVars;
     ctx->localVarCount = localsCount;
 
@@ -3749,6 +3738,7 @@ RValue VM_executeCode(VMContext* ctx, int32_t codeIndex) {
     repeat(ctx->localVarCount, i) {
         RValue_free(&ctx->localVars[i]);
     }
+    free(ctx->localVars);
     ctx->localVars = nullptr;
     ctx->localVarCount = 0;
 
@@ -3787,9 +3777,7 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
     setCurrentCodeLocalsSlotMap(ctx);
 
     uint32_t localsCount = computeLocalsCount(ctx, code);
-    // We use fixed-size arrays instead of VLAs because it seems that using multiple VLAs in a single function things get corrupted somehow?
-    // So when you see this MAX_CODE_LOCALS and GML_MAX_ARGUMENTS, you can shake your fist in the air and say "damn you MIPS!!1"
-    RValue localVars[MAX_CODE_LOCALS] = {0};
+    RValue* localVars = safeCalloc(localsCount, sizeof(RValue));
     ctx->localVars = localVars;
     ctx->localVarCount = localsCount;
 
@@ -3833,6 +3821,8 @@ RValue VM_callCodeIndex(VMContext* ctx, int32_t codeIndex, RValue* args, int32_t
     repeat(ctx->localVarCount, i) {
         RValue_free(&ctx->localVars[i]);
     }
+
+    free(ctx->localVars);
 
     // Free callee script args
     repeat(ctx->scriptArgCount, i) {
