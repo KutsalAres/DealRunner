@@ -46,6 +46,7 @@ jobs:
         run: |
           games=(
             undertale-ptbr-winpack
+            underfavela
           )
           for game in "${games[@]}"; do
             echo "Downloading $game..."

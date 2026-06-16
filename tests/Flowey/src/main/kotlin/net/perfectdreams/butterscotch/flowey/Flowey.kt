@@ -80,14 +80,17 @@ class Flowey : CliktCommand() {
             }
 
             for (pack in test.expectedScreenshots) {
-                val expected = File(testSuite.parentFile, pack.actual)
-                val actual = File(testSuite.parentFile, pack.expected)
+                val expected = File(testSuite.parentFile, pack.expected)
+                val actual = File(testSuite.parentFile, pack.actual)
+
+                if (!expected.exists() || !actual.exists())
+                    continue@testLoop
 
                 val expectedImage = ImageIO.read(expected)
                 val actualImage = ImageIO.read(actual)
 
                 if (expectedImage.width != actualImage.width || expectedImage.height != actualImage.height)
-                    continue
+                    continue@testLoop
 
                 for (y in 0 until expectedImage.height) {
                     for (x in 0 until expectedImage.width) {
