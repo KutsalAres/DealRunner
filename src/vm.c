@@ -748,7 +748,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
 #if IS_WAD17_OR_HIGHER_ENABLED
     // BC17+: instanceType == INSTANCE_BUILTIN (-6) on a Push.v means "look up this name as a function reference" (emitted for CallV dispatch paths like `@@This@@(); texture_set_interpolation_ext; CallV`).
     // Intercept before the builtin-variable path: only treat it as a function if the VARI entry isn't a real built-in variable (varID == -6 with a resolved builtinVarId).
-    if (IS_WAD17_OR_HIGHER(ctx) && instanceType == INSTANCE_BUILTIN && !(varDef->varID == -6 && varDef->builtinVarId != -1)) {
+    if (IS_WAD17_OR_HIGHER(ctx) && instanceType == INSTANCE_BUILTIN && !(varDef->varID == VARIABLE_BUILTIN && varDef->builtinVarId != -1)) {
         // `@@This@@(); push.v bltn.<name>; CallV` is also used for `self.method()` where `method` is a user-defined method stored on the instance (e.g. `init = method(...)` on an object).
         // CallV pops [func, instance, args], so the instance is sitting right below the func we're about to push. Peek at it and try to read `<name>` off its selfVars first; if the VARI entry has a self scope and the peeked slot resolves to an instance with the field, return that method. Otherwise fall through to global function lookup.
         if (varDef->instanceType == INSTANCE_SELF && ctx->stack.top > 0) {
@@ -788,7 +788,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
 #endif
 
     // Check for built-in variable (varID == -6 sentinel)
-    if (varDef->varID == -6) {
+    if (varDef->varID == VARIABLE_BUILTIN) {
         // Structs aren't real game instances, but structs CAN store fields with the same names as built-ins.
         // So we'll check the self variables FIRST before checking for built-ins.
         if (targetInstance != nullptr && targetInstance->objectIndex == STRUCT_OBJECT_INDEX) {
@@ -889,7 +889,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
 // Helper: write a variable value to a single specific instance (always copies, never moves the original val)
 static void writeSingleInstanceVariable(VMContext* ctx, Instance* inst, Variable* varDef, ArrayAccess* access, RValue val) {
     // Built-in variable (varID == -6 sentinel)
-    if (varDef->varID == -6) {
+    if (varDef->varID == VARIABLE_BUILTIN) {
         VMBuiltins_setVariable(ctx, inst, varDef->builtinVarId, varDef->name, val, access->arrayIndex);
         return;
     }
@@ -1057,7 +1057,7 @@ static void resolveVariableWrite(VMContext* ctx, int32_t instanceType, uint32_t 
     }
 
     // Check for built-in variable (varID == -6 sentinel)
-    if (varDef->varID == -6) {
+    if (varDef->varID == VARIABLE_BUILTIN) {
         VMBuiltins_setVariable(ctx, targetInstance, varDef->builtinVarId, varDef->name, val, access.arrayIndex);
 
 #ifdef ENABLE_VM_TRACING
@@ -1445,7 +1445,7 @@ static void handlePop(VMContext* ctx, uint8_t type1, uint8_t type2, uint32_t var
 
     if (varType == VARTYPE_ARRAY) {
         Variable* varDef = resolveVarDef(ctx, varRef);
-        if (varDef->varID == -6) {
+        if (varDef->varID == VARIABLE_BUILTIN) {
             // Resolve target instance for built-in array variable writes (e.g. obj_foo.alarm[0] = 2)
             if (instanceType >= 0 && 100000 > instanceType) {
                 // Object reference: write to ALL instances of that object. The setter can run user code, so iterate a snapshot of the bucket.
@@ -2993,7 +2993,7 @@ static RValue executeLoop(VMContext* ctx) {
                 // So due to that, we'll take the slow path if it is a builtin variable.
                 // The native runner does NOT handle global arrays from this path, so we don't need to care about them.
                 Variable* varDef = resolveVarDef(ctx, varRef);
-                if (varDef->varID == -6) {
+                if (varDef->varID == VARIABLE_BUILTIN) {
                     RValue val = resolveVariableRead(ctx, INSTANCE_GLOBAL, varRef);
                     stackPushTyped(ctx, val, GML_TYPE_VARIABLE);
                     break;
@@ -3474,7 +3474,7 @@ VMContext* VM_create(DataWin* dataWin) {
         Variable* var = &dataWin->vari.variables[i];
         // varID == -6 is the BC16 built-in sentinel.
         // In BC17, argument variables have instanceType == -6 (Builtin) with varID >= 0, so we also check instanceType.
-        if (IS_WAD15_OR_HIGHER(ctx) && (var->varID == -6 || var->instanceType == -6)) {
+        if (IS_WAD15_OR_HIGHER(ctx) && (var->varID == VARIABLE_BUILTIN || var->instanceType == -6)) {
             var->builtinVarId = VMBuiltins_resolveBuiltinVarId(var->name);
         } else if (IS_WAD14_OR_BELOW(ctx)) {
             // BC13/14 has no -6 sentinel in the file. Detect builtins by name and switch the VARI entry to use the BC16 sentinel so downstream dispatch paths treat it as a builtin.

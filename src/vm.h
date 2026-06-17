@@ -29,6 +29,9 @@
 #define VARTYPE_NORMAL    0xA0
 #define VARTYPE_INSTANCE  0xE0
 
+// ===[ Variable Identities ]===
+#define VARIABLE_BUILTIN (-6)
+
 // ===[ Room Constants ]===
 #define ROOM_RESTARTGAME (-200) // The reason why it is -200 is because the GameMaker-HTML5 runner uses -200 too (see Globals.js)
 
