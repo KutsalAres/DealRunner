@@ -490,12 +490,12 @@ static uint32_t resolveLocalSlot(VMContext* ctx, int32_t varID) {
 }
 
 // Finds an instance by target value.
-// target >= 100000: instance ID (find specific instance, including recently-destroyed-but-not-cleaned-up-yet ones so GML code can read properties of an instance just after instance_destroy within the same step).
-// target >= 0 && target < 100000: object index (find first ACTIVE instance of that object, checking parent chains)
+// target >= INSTANCE_ID_BASE: instance ID (find specific instance, including recently-destroyed-but-not-cleaned-up-yet ones so GML code can read properties of an instance just after instance_destroy within the same step).
+// target >= 0 && target < INSTANCE_ID_BASE: object index (find first ACTIVE instance of that object, checking parent chains)
 static Instance* findInstanceByTarget(VMContext* ctx, int32_t target) {
     Runner* runner = (Runner*) ctx->runner;
 
-    if (target >= 100000) {
+    if (target >= INSTANCE_ID_BASE) {
         // Instance ID - find specific instance
         return hmget(runner->instancesById, target);
     }
@@ -689,7 +689,7 @@ static RValue resolveVariableRead(VMContext* ctx, int32_t instanceType, uint32_t
         targetInstance = findInstanceByTarget(ctx, instanceType);
         if (targetInstance == nullptr) {
             const char* varTypeName = varTypeToString((varRef >> 24) & 0xF8);
-            if (instanceType < 100000 && (uint32_t) instanceType < ctx->dataWin->objt.count) {
+            if (instanceType < INSTANCE_ID_BASE && (uint32_t) instanceType < ctx->dataWin->objt.count) {
                 GameObject* gameObject = &ctx->dataWin->objt.objects[instanceType];
                 fprintf(stderr, "VM: [%s] READ var '%s' on object index %d (%s) but no instance found (varType=%s, isArray=%s, originalInstanceType=%d, hasInstanceType=%s, varID=%d)\n", ctx->currentCodeName, varDef->name, instanceType, gameObject->name, varTypeName, access.isArray ? "true" : "false", originalInstanceType, access.hasInstanceType ? "true" : "false", varDef->varID);
             } else {
@@ -954,7 +954,7 @@ static void resolveVariableWrite(VMContext* ctx, int32_t instanceType, uint32_t 
 #endif
 
     // GML: writing through an object reference (obj_foo.var = val) sets the variable on ALL instances of that object. The setter (writeSingleInstanceVariable) can run user code, so iterate a snapshot of the bucket.
-    if (instanceType >= 0 && 100000 > instanceType) {
+    if (instanceType >= 0 && INSTANCE_ID_BASE > instanceType) {
         Runner* runner = (Runner*) ctx->runner;
         bool found = false;
         int32_t snapBase = Runner_pushInstancesOfObject(runner, instanceType);
@@ -981,7 +981,7 @@ static void resolveVariableWrite(VMContext* ctx, int32_t instanceType, uint32_t 
         return;
     }
 
-    // Resolve target instance for instance ID references (instanceType >= 100000) or special types
+    // Resolve target instance for instance ID references (instanceType >= INSTANCE_ID_BASE) or special types
     Instance* targetInstance = (Instance*) ctx->currentInstance;
     if (instanceType >= 0) {
         targetInstance = findInstanceByTarget(ctx, instanceType);
@@ -1163,9 +1163,9 @@ static void handlePush(VMContext* ctx, uint32_t instr, const uint8_t* extraData,
             int32_t instanceType = (int32_t) instrInstanceType(instr);
             uint32_t varRef = resolveVarOperand(extraData);
             uint8_t varType = (varRef >> 24) & 0xF8;
-            // BC17: VARTYPE_INSTANCE encodes (instanceId - 100000) in the instruction's lower 16 bits.
-            // Add 100000 back so findInstanceByTarget sees the real runtime instance ID.
-            if (varType == VARTYPE_INSTANCE) instanceType += 100000;
+            // BC17: VARTYPE_INSTANCE encodes (instanceId - INSTANCE_ID_BASE) in the instruction's lower 16 bits.
+            // Add INSTANCE_ID_BASE back so findInstanceByTarget sees the real runtime instance ID.
+            if (varType == VARTYPE_INSTANCE) instanceType += INSTANCE_ID_BASE;
 #if IS_WAD17_OR_HIGHER_ENABLED
             if (varType == VARTYPE_ARRAYPUSHAF || varType == VARTYPE_ARRAYPOPAF) {
                 // V17: multi-dim first-step. Stack has [scope, firstIndex] (with an optional real-instance slot underneath when scope == -9 INSTANCE_STACKTOP).
@@ -1405,7 +1405,7 @@ static void handlePop(VMContext* ctx, uint8_t type1, uint8_t type2, uint32_t var
         Variable* varDef = resolveVarDef(ctx, varRef);
         if (varDef->varID == VARIABLE_BUILTIN) {
             // Resolve target instance for built-in array variable writes (e.g. obj_foo.alarm[0] = 2)
-            if (instanceType >= 0 && 100000 > instanceType) {
+            if (instanceType >= 0 && INSTANCE_ID_BASE > instanceType) {
                 // Object reference: write to ALL instances of that object. The setter can run user code, so iterate a snapshot of the bucket.
                 Runner* runner = (Runner*) ctx->runner;
                 Instance* savedInstance = (Instance*) ctx->currentInstance;
@@ -1471,7 +1471,7 @@ static void handlePop(VMContext* ctx, uint8_t type1, uint8_t type2, uint32_t var
                         if (inst == nullptr) {
                             const char* varTypeName = varTypeToString(varType);
                             char* valAsString = RValue_toString(val);
-                            if (instanceType < 100000 && (uint32_t) instanceType < ctx->dataWin->objt.count) {
+                            if (instanceType < INSTANCE_ID_BASE && (uint32_t) instanceType < ctx->dataWin->objt.count) {
                                 fprintf(stderr, "VM: [%s] WRITE array var '%s[%d]' on object index %d (%s) but no instance found (varType=%s, originalInstanceType=%d, varID=%d, value=%s)\n", ctx->currentCodeName, varDef->name, arrayIndex, instanceType, ctx->dataWin->objt.objects[instanceType].name, varTypeName, originalInstanceType, varDef->varID, valAsString);
                             } else {
                                 fprintf(stderr, "VM: [%s] WRITE array var '%s[%d]' on instance %d but no instance found (varType=%s, originalInstanceType=%d, varID=%d, value=%s)\n", ctx->currentCodeName, varDef->name, arrayIndex, instanceType, varTypeName, originalInstanceType, varDef->varID, valAsString);
@@ -2291,7 +2291,7 @@ static void handlePushEnv(VMContext* ctx, uint32_t instr, uint32_t instrAddr) {
         return;
     }
 
-    if (target >= 0 && 100000 > target) {
+    if (target >= 0 && INSTANCE_ID_BASE > target) {
         // Object index - copy the descendant-inclusive list for this object into the frame's own list. frame->instanceList has with-block lifetime (not the snapshot arena's loop lifetime), so we don't use the forEach macro; we just copy directly and filter "active" to match prior semantics (deactivated instances are skipped).
         if (ctx->dataWin->objt.count > (uint32_t) target) {
             Instance** source = runner->instancesByObject[target];
@@ -2336,7 +2336,7 @@ static void handlePushEnv(VMContext* ctx, uint32_t instr, uint32_t instrAddr) {
         return;
     }
 
-    if (target >= 100000) {
+    if (target >= INSTANCE_ID_BASE) {
         // Instance ID - find specific instance
         Instance* inst = hmget(runner->instancesById, target);
         if (inst != nullptr && inst->active) {
@@ -2980,8 +2980,8 @@ static RValue executeLoop(VMContext* ctx) {
                 uint32_t varRef = resolveVarOperand(extraData);
                 uint8_t varType = (uint8_t) ((varRef >> 24) & 0xF8);
                 int32_t instanceType = instrInstanceType(instr);
-                // BC17: VARTYPE_INSTANCE encodes (instanceId - 100000) in the instruction's lower 16 bits.
-                if (varType == VARTYPE_INSTANCE) instanceType += 100000;
+                // BC17: VARTYPE_INSTANCE encodes (instanceId - INSTANCE_ID_BASE) in the instruction's lower 16 bits.
+                if (varType == VARTYPE_INSTANCE) instanceType += INSTANCE_ID_BASE;
                 int32_t type2 = instrType2(instr); // source type (what's on stack)
                 if (type1 == GML_TYPE_VARIABLE && varType == VARTYPE_NORMAL) {
                     // Inline fast path for the simple variable-assignment case: type1==VARIABLE, which is ~99.998% of all Pops in real workloads

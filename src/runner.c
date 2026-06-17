@@ -158,7 +158,7 @@ int32_t Runner_pushInstancesForTarget(Runner* runner, int32_t target) {
         memcpy(&runner->instanceSnapshots[base], runner->instances, (size_t) total * sizeof(Instance*));
         return base;
     }
-    if (target >= 100000) {
+    if (target >= INSTANCE_ID_BASE) {
         Instance* inst = hmget(runner->instancesById, target);
         if (inst != nullptr) arrput(runner->instanceSnapshots, inst);
         return base;
@@ -3164,7 +3164,7 @@ static void updateViews(Runner* runner) {
         Instance* target = nullptr;
         int32_t targetId = camera->objectId;
 
-        if (targetId >= 100000) {
+        if (targetId >= INSTANCE_ID_BASE) {
             // It's an instance ID - look it up directly
             target = hmget(runner->instancesById, targetId);
             if (target != nullptr && (!target->active || target->destroyed)) {

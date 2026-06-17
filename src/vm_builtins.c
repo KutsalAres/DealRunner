@@ -3782,7 +3782,7 @@ static bool variableInstanceExistsOn(VMContext* ctx, Instance* target, const cha
 static RValue variableScopedGet(VMContext* ctx, int32_t id, const char* name, bool structOnly, const char* originBuiltin) {
     Runner* runner = ctx->runner;
 
-    if (id >= 100000) {
+    if (id >= INSTANCE_ID_BASE) {
         Instance* inst = hmget(runner->instancesById, id);
         if (inst != nullptr && variableScopedMatches(inst, structOnly)) return variableInstanceGetOn(ctx, inst, name, originBuiltin);
         return RValue_makeUndefined();
@@ -3806,7 +3806,7 @@ static RValue variableScopedGet(VMContext* ctx, int32_t id, const char* name, bo
 static void variableScopedSet(VMContext* ctx, int32_t id, const char* name, RValue val, bool structOnly, const char* originBuiltin) {
     Runner* runner = ctx->runner;
 
-    if (id >= 100000) {
+    if (id >= INSTANCE_ID_BASE) {
         Instance* inst = hmget(runner->instancesById, id);
         if (inst != nullptr && variableScopedMatches(inst, structOnly)) variableInstanceSetOn(ctx, inst, name, val, originBuiltin);
         return;
@@ -3825,7 +3825,7 @@ static void variableScopedSet(VMContext* ctx, int32_t id, const char* name, RVal
 static bool variableScopedExists(VMContext* ctx, int32_t id, const char* name, bool structOnly) {
     Runner* runner = ctx->runner;
 
-    if (id >= 100000) {
+    if (id >= INSTANCE_ID_BASE) {
         Instance* inst = hmget(runner->instancesById, id);
         if (inst != nullptr && variableScopedMatches(inst, structOnly)) return variableInstanceExistsOn(ctx, inst, name);
         return false;

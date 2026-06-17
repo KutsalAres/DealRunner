@@ -51,6 +51,8 @@
 // Newer GM versions do NOT have an argument limit however, but the limit is still used for the old classic style "argumentX" access
 #define GML_MAX_ARGUMENTS 16
 
+#define INSTANCE_ID_BASE 100000
+
 // ===[ Comparison Kinds ]===
 #define CMP_LT  1
 #define CMP_LTE 2
