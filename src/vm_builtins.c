@@ -4108,22 +4108,23 @@ static RValue builtin_ds_exists(VMContext* ctx, MAYBE_UNUSED RValue* args, MAYBE
     int32_t index = RValue_toInt32(args[0]);
     int32_t dsType = RValue_toInt32(args[1]);
 
+    // TODO: Maps don't have freed status
     if (dsType == DS_TYPE_MAP && arrlen(runner->dsMapPool) > index && index >= 0)
         return RValue_makeBool(true);
 
-    if (dsType == DS_TYPE_LIST && arrlen(runner->dsListPool) > index && index >= 0)
+    if (dsType == DS_TYPE_LIST && arrlen(runner->dsListPool) > index && index >= 0 && !runner->dsListPool[index].freed)
         return RValue_makeBool(true);
 
-    if (dsType == DS_TYPE_STACK && arrlen(runner->dsStackPool) > index && index >= 0)
+    if (dsType == DS_TYPE_STACK && arrlen(runner->dsStackPool) > index && index >= 0 && !runner->dsStackPool[index].freed)
         return RValue_makeBool(true);
 
-    if (dsType == DS_TYPE_GRID && arrlen(runner->dsGridPool) > index && index >= 0)
+    if (dsType == DS_TYPE_GRID && arrlen(runner->dsGridPool) > index && index >= 0 && !runner->dsGridPool[index].freed)
         return RValue_makeBool(true);
 
-    if (dsType == DS_TYPE_QUEUE && arrlen(runner->dsQueuePool) > index && index >= 0)
+    if (dsType == DS_TYPE_QUEUE && arrlen(runner->dsQueuePool) > index && index >= 0 && !runner->dsQueuePool[index].freed)
         return RValue_makeBool(true);
 
-    if (dsType == DS_TYPE_PRIORITY && arrlen(runner->dsPriorityPool) > index && index >= 0)
+    if (dsType == DS_TYPE_PRIORITY && arrlen(runner->dsPriorityPool) > index && index >= 0 && !runner->dsPriorityPool[index].freed)
         return RValue_makeBool(true);
 
     return RValue_makeBool(false);
