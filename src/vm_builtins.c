@@ -14814,7 +14814,7 @@ static RValue builtin_object_is_ancestor(VMContext* ctx, RValue* args, int32_t a
     int32_t parentId = ctx->dataWin->objt.objects[id].parentId;
     if (parentId == -1) return RValue_makeBool(false);
 
-    while (parentId != -1) {
+    while (parentId >= -1) {
         if (parentId == ancestorId) return RValue_makeBool(true);
         parentId = ctx->dataWin->objt.objects[parentId].parentId;
     }
