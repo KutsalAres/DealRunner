@@ -113,7 +113,7 @@ if [ "$syntax" != 'msvc' ] && check 'if the compiler supports -fno-builtin' -fno
     cflags='-fno-builtin'
 fi
 
-if [ "$syntax" == 'msvc' ] || ! check 'if the compiler supports -MMD -MP -MF test.d' -MMD -MP -MF tmp/test.d; then
+if [ "$syntax" = 'msvc' ] || ! check 'if the compiler supports -MMD -MP -MF test.d' -MMD -MP -MF tmp/test.d; then
     config 'DISABLE_MMD := 1'
 fi
 rm -f tmp/test.d
