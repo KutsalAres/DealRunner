@@ -2223,6 +2223,19 @@ static RValue builtin_string_count(MAYBE_UNUSED VMContext* ctx, RValue* args, in
     return RValue_makeInt32(count);
 }
 
+// Source - https://stackoverflow.com/a/15515276
+static RValue builtin_string_starts_with(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
+    if (2 > argCount) return RValue_makeInt32(0);
+    char* substr = RValue_toString(args[0]);
+    char* str = RValue_toString(args[1]);
+    
+    bool ret = (strncmp(str, substr, strlen(substr)) == 0);
+
+    free(substr);
+    free(str);
+    return RValue_makeBool(ret);
+}
+
 static RValue builtin_ord(MAYBE_UNUSED VMContext* ctx, RValue* args, int32_t argCount) {
     if (1 > argCount || args[0].type != RVALUE_STRING || args[0].string == nullptr || args[0].string[0] == '\0') {
         return RValue_makeReal(0.0);
@@ -13025,6 +13038,27 @@ static RValue builtin_layer_get_element_type(VMContext* ctx, RValue* args, MAYBE
     return RValue_makeReal((GMLReal) el->type);
 }
 
+static RValue builtin_layer_element_move(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
+    Runner* runner = ctx->runner;
+    int32_t elementId = RValue_toInt32(args[0]);
+    int32_t layerId = resolveLayerIdArg(runner, args[1]);
+    RuntimeLayer* rl = Runner_findRuntimeLayerById(runner, layerId);
+    RuntimeLayer* oldRl = nullptr;
+    RuntimeLayerElement* el = Runner_findLayerElementById(runner, elementId, &oldRl);
+
+    arrput(rl->elements, *el);
+
+    size_t count = arrlenu(oldRl->elements);
+    repeat(count, i) {
+        if (&oldRl->elements[i] == el) {
+            arrdel(oldRl->elements, i);
+            break;
+        }
+    }
+    
+    return RValue_makeUndefined();
+}
+
 static RValue builtin_layer_tile_visible(VMContext* ctx, RValue* args, MAYBE_UNUSED int32_t argCount) {
     Runner* runner = ctx->runner;
     int32_t id = RValue_toInt32(args[0]);
@@ -15451,6 +15485,40 @@ static RValue builtin_texture_get_uvs(VMContext* ctx, MAYBE_UNUSED RValue* args,
     return RValue_makeArray(out);
 }
 
+
+// sprite_get_info(sprite): returns a struct with the sprite information.
+static RValue builtin_sprite_get_info(VMContext* ctx, RValue* args, int32_t argCount) {
+    if (1 > argCount) return RValue_makeUndefined();
+    int32_t spriteIndex = RValue_toInt32(args[0]);
+    if (0 > spriteIndex || (uint32_t) spriteIndex >= ctx->dataWin->sprt.count) return RValue_makeUndefined();
+    Sprite* sprite = &ctx->dataWin->sprt.sprites[spriteIndex];
+
+    Instance* ret = Runner_createStruct(ctx->runner);
+    VM_structSetAndFreeVal(ctx, ret, "width", RValue_makeReal(sprite->width), 0);
+    VM_structSetAndFreeVal(ctx, ret, "height", RValue_makeReal(sprite->height), 1);
+    VM_structSetAndFreeVal(ctx, ret, "xoffset", RValue_makeReal(sprite->originX), 2);
+    VM_structSetAndFreeVal(ctx, ret, "yoffset", RValue_makeReal(sprite->originY), 3);
+    VM_structSetAndFreeVal(ctx, ret, "transparent", RValue_makeBool(sprite->transparent), 4);
+    VM_structSetAndFreeVal(ctx, ret, "smooth", RValue_makeBool(sprite->smooth), 5);
+    VM_structSetAndFreeVal(ctx, ret, "type", RValue_makeBool(sprite->sSpriteType), 6);
+    VM_structSetAndFreeVal(ctx, ret, "bbox_left", RValue_makeReal(sprite->marginLeft), -1);
+    VM_structSetAndFreeVal(ctx, ret, "bbox_top", RValue_makeReal(sprite->marginTop), -1);
+    VM_structSetAndFreeVal(ctx, ret, "bbox_right", RValue_makeReal(sprite->marginRight), -1);
+    VM_structSetAndFreeVal(ctx, ret, "bbox_bottom", RValue_makeReal(sprite->marginBottom), -1);
+    VM_structSetAndFreeVal(ctx, ret, "name", RValue_makeString(sprite->name), -1);
+    VM_structSetAndFreeVal(ctx, ret, "num_subimages", RValue_makeReal(sprite->textureCount), -1);
+    VM_structSetAndFreeVal(ctx, ret, "use_mask", RValue_makeBool(sprite->maskCount == 0), -1);
+    VM_structSetAndFreeVal(ctx, ret, "num_masks", RValue_makeReal(sprite->maskCount), -1);
+    VM_structSetAndFreeVal(ctx, ret, "rotated_bounds", RValue_makeBool(false), -1);
+    VM_structSetAndFreeVal(ctx, ret, "nineslice", RValue_makeUndefined(), -1);
+    VM_structSetAndFreeVal(ctx, ret, "messages", RValue_makeUndefined(), -1);
+    VM_structSetAndFreeVal(ctx, ret, "frame_info", RValue_makeUndefined(), -1);
+    VM_structSetAndFreeVal(ctx, ret, "frame_speed", RValue_makeReal(sprite->gms2PlaybackSpeed), -1);
+    VM_structSetAndFreeVal(ctx, ret, "frame_type", RValue_makeReal(sprite->gms2PlaybackSpeedType), -1);
+
+    return RValue_makeStructAndIncRef(ret);
+}
+
 // ===[ REGISTRATION ]===
 
 void VMBuiltins_registerAll(VMContext* ctx) {
@@ -15483,6 +15551,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "string_repeat", builtin_string_repeat);
     VM_registerBuiltin(ctx, "string_format", builtin_string_format);
     VM_registerBuiltin(ctx, "string_count", builtin_string_count);
+    VM_registerBuiltin(ctx, "string_starts_with", builtin_string_starts_with);
     VM_registerBuiltin(ctx, "ord", builtin_ord);
     VM_registerBuiltin(ctx, "chr", builtin_chr);
 
@@ -16307,6 +16376,7 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "layer_tile_get_yscale", builtin_layer_tile_get_yscale);
     VM_registerBuiltin(ctx, "layer_tile_get_region", builtin_layer_tile_get_region);
     VM_registerBuiltin(ctx, "layer_background_destroy", builtin_layer_background_destroy);
+    VM_registerBuiltin(ctx, "layer_element_move", builtin_layer_element_move);
 
     // GMS2 internal
     VM_registerBuiltin(ctx, "@@NewGMLArray@@", builtin_NewGMLArray);
@@ -16493,4 +16563,5 @@ void VMBuiltins_registerAll(VMContext* ctx) {
     VM_registerBuiltin(ctx, "texture_get_texel_height", builtin_texture_get_texel_height);
     VM_registerBuiltin(ctx, "texture_get_uvs", builtin_texture_get_uvs);
     VM_registerBuiltin(ctx, "texture_set_stage", builtin_texture_set_stage);
+    VM_registerBuiltin(ctx, "sprite_get_info", builtin_sprite_get_info);
 }
