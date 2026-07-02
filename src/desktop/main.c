@@ -86,7 +86,7 @@ static int platformInitGlad(GLADloadproc load) {
 }
 #endif
 
-#ifdef ENABLE_MODERN_GL
+#if (defined(ENABLE_MODERN_GL) || defined(ENABLE_LEGACY_GL)) && !defined(NDEBUG)
 static void APIENTRY glDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, MAYBE_UNUSED GLsizei length, const GLchar* message, MAYBE_UNUSED const void* userParam) {
     const char* sourceStr;
     switch (source) {
@@ -1299,7 +1299,7 @@ int main(int argc, char* argv[]) {
 #endif
 
             // Install the OpenGL debug message callback
-#ifdef ENABLE_MODERN_GL
+#if (defined(ENABLE_MODERN_GL) || defined(ENABLE_LEGACY_GL)) && !defined(NDEBUG)
             if (gfx == MODERN_GL)
                 installGLDebugCallback();
 #endif
