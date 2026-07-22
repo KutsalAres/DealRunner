@@ -2865,16 +2865,14 @@ static void dispatchMouseEvents(Runner* runner) {
     GMLReal mx, my;
     Runner_getMouseRoomPosition(runner, &mx, &my);
 
-    {
-        FILE* dbgLog = fopen("/sdcard/logcat.txt", "a");
-        if (dbgLog != nullptr) {
-            fprintf(dbgLog, "MOUSE DEBUG: room=(%f,%f) viewport=(%d,%d,%d,%d) screenXY=(%f,%f) down=%d\n",
-                mx, my,
-                runner->viewportX, runner->viewportY, runner->viewportW, runner->viewportH,
-                runner->mouse->screenX, runner->mouse->screenY,
-                RunnerMouse_checkButton(mouse, GML_MB_LEFT));
-            fclose(dbgLog);
-        }
+    if (RunnerMouse_checkButton(mouse, GML_MB_LEFT) || RunnerMouse_checkButtonPressed(mouse, GML_MB_LEFT) || RunnerMouse_checkButtonReleased(mouse, GML_MB_LEFT)) {
+        fprintf(stderr, "MOUSEDBG room=(%.1f,%.1f) viewport=(%d,%d,%d,%d) screenXY=(%.1f,%.1f) down=%d pressed=%d released=%d\n",
+            mx, my,
+            runner->viewportX, runner->viewportY, runner->viewportW, runner->viewportH,
+            runner->mouse->screenX, runner->mouse->screenY,
+            RunnerMouse_checkButton(mouse, GML_MB_LEFT),
+            RunnerMouse_checkButtonPressed(mouse, GML_MB_LEFT),
+            RunnerMouse_checkButtonReleased(mouse, GML_MB_LEFT));
     }
 
     // ---[ Global events: fire for all objects regardless of mouse position ]---
