@@ -103,6 +103,26 @@ static void setWindowTitle(const char* title) {
 
 #define JNI_FN(name) Java_net_perfectdreams_butterscotch_android_ButterscotchNative_##name
 
+static char* gDebugLogPath = nullptr;
+
+JNIEXPORT void JNICALL JNI_FN(setDebugLogPath)(JNIEnv* env, MAYBE_UNUSED jclass cls, jstring jPath) {
+    free(gDebugLogPath);
+    const char* path = (*env)->GetStringUTFChars(env, jPath, nullptr);
+    gDebugLogPath = safeStrdup(path);
+    (*env)->ReleaseStringUTFChars(env, jPath, path);
+}
+
+static void debugLog(const char* fmt, ...) {
+    if (gDebugLogPath == nullptr) return;
+    FILE* f = fopen(gDebugLogPath, "a");
+    if (f == nullptr) return;
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(f, fmt, args);
+    va_end(args);
+    fclose(f);
+}
+
 JNIEXPORT void JNICALL JNI_FN(init)(MAYBE_UNUSED JNIEnv* env, MAYBE_UNUSED jclass cls) {
     // Set stdout and stderr to not be buffered
     setvbuf(stdout, nullptr, _IOLBF, 0);
